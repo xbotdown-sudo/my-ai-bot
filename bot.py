@@ -1,63 +1,52 @@
 import telebot
 import requests
 import time
+import os
 import urllib3
 
-# সিকিউরিটি ওয়ার্নিং বন্ধ করার জন্য
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-# =========================================================
-# ১. আপনার সঠিক টোকেন ও এপিআই কী এখানে বসান
-BOT_TOKEN = '8614776609:AAHMWcIj0Ly5dT2Jn4gYMxuwSz7iD1aoUJA'
-NARA_API_KEY = 'sk-nry-ClgklCNwa-xtJd-kep0OorVZJz-os18PU5g3SuYt43w'
-# =========================================================
+# রেন্ডার ড্যাশবোর্ড থেকে অটোমেটিক সিক্রেট কী ও টোকেন রিড করার সিস্টেম
+BOT_TOKEN = os.environ.get('BOT_TOKEN')
+NARA_API_KEY = os.environ.get('NARA_API_KEY')
 
 bot = telebot.TeleBot(BOT_TOKEN)
 bot.threaded = False
 
-# /start দিলে স্বাগত বার্তা
 @bot.message_handler(commands=['start', 'help'])
 def send_welcome(message):
-    bot.reply_to(message, "🤖 হ্যালো! আমি কোনো ঝামেলা ছাড়াই সরাসরি চালিত আপনার পার্সোনাল এআই বট।")
+    bot.reply_to(message, "🤖 হ্যালো! আমি ২৪ ঘণ্টা সচল থাকা আপনার পার্সোনাল এআই বট।")
 
-# মেসেজ আসলে NaraRouter এআই উত্তর দেবে
 @bot.message_handler(func=lambda message: True)
 def ask_nara_ai(message):
-    user_question = message.text
-    bot.send_chat_action(message.chat.id, 'typing')
-    
-    # ডোমেইন ব্লক বাইপাস করার জন্য সরাসরি অফিশিয়াল আইপি বা গেটওয়ে ব্যবহার
-    url = "https://bynara.id"
-    
-    headers = {
-        "Authorization": f"Bearer {NARA_API_KEY}",
-        "Content-Type": "application/json",
-        "Host": "router.bynara.id" # ক্লাউডফ্লেয়ার ব্লকিং বাইপাস হেডজার
-    }
-    
-    payload = {
-        "model": "agnes-2.0-flash", 
-        "messages": [{"role": "user", "content": user_question}]
-    }
-    
-    try:
-        # verify=False দেওয়া হয়েছে যাতে লোকাল SSL এরর না আসে
-        response = requests.post(url, headers=headers, json=payload, timeout=25, verify=False)
-        response_data = response.json()
-        
-        ai_reply = response_data['choices']['message']['content']
-        bot.reply_to(message, ai_reply)
-        
-    except Exception as e:
-        print(f"এআই রেসপন্স এরর: {e}")
-        bot.reply_to(message, "🤖 দুঃখিত, সার্ভার একটু স্লো। দয়া করে আরেকবার মেসেজটি পাঠান।")
+    user_question = message.text
+    bot.send_chat_action(message.chat.id, 'typing')
+    
+    # এপিআই এন্ডপয়েন্ট গেটওয়ে সঠিক করা হয়েছে
+    url = "https://bynara.id"
+    
+    headers = {
+        "Authorization": f"Bearer {NARA_API_KEY}",
+        "Content-Type": "application/json"
+    }
+    
+    payload = {
+        "model": "agnes-2.0-flash", 
+        "messages": [{"role": "user", "content": user_question}]
+    }
+    
+    try:
+        response = requests.post(url, headers=headers, json=payload, timeout=25)
+        response_data = response.json()
+        ai_reply = response_data['choices']['message']['content']
+        bot.reply_to(message, ai_reply)
+    except Exception as e:
+        print(f"Error: {e}")
+        bot.reply_to(message, "🤖 দুঃখিত, উত্তর তৈরি করতে সমস্যা হচ্ছে। দয়া করে আবার চেষ্টা করুন।")
 
-# টেলিগ্রাম কানেকশন এরর হ্যান্ডেল করার মেইন লুপ
-print("🎉 আপনার ঝামেলা-মুক্ত AI বট সফলভাবে ব্যাকগ্রাউন্ডে চালু হয়েছে...")
+print("বট সচল আছে...")
 while True:
-    try:
-        bot.polling(non_stop=True, timeout=90, long_polling_timeout=90)
-    except Exception as e:
-        # কানেকশন ড্রপ করলে কোড ক্র্যাশ করবে না, নিজে থেকেই ৫ সেকেন্ড পর আবার কানেক্ট হবে
-        print(f"কানেকশন ড্রপ করেছে ({e})। ৫ সেকেন্ড পর অটো-রিকানেক্ট হচ্ছে...")
-        time.sleep(5)
+    try:
+        bot.polling(non_stop=True, timeout=90, long_polling_timeout=90)
+    except Exception:
+        time.sleep(5)
